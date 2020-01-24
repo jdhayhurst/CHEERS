@@ -60,7 +60,7 @@ output of the code: CHEERS_normalize.py
 
 #load data
 
-conn = sqlite3.connect(':memory:')
+conn = sqlite3.connect('cheers_tmp.db')
 
 @profile
 def load_sample_data(readin, samplesList):
@@ -73,14 +73,14 @@ def load_sample_data(readin, samplesList):
         df['rank_' + str(sample)] = df[sample].rank(method='min').astype(int)
         df.rename(columns={sample: 'value_' + str(sample)}, inplace=True)
     melt = pd.wide_to_long(df, ['value', 'rank'], i=['chr', 'start', 'end'], j='sample', sep='_', suffix='\\w+').reset_index() 
-    melt.to_sql('peaks', conn, index=False)
+    melt.to_sql('peaks', conn, index=False, if_exists='replace')
     return melt, rowCount
     # Coul break write to disk here if needed
 
 @profile
 def load_snps(snps):
     df = pd.read_csv(snps, sep='\t', header=None, names=['name', 'snp_chr', 'pos'])
-    df.to_sql('snps', conn, index=False)
+    df.to_sql('snps', conn, index=False, if_exists='replace')
 
 sql_query = '''
        select peaks.*, snps.name, snps.snp_chr, snps.pos
