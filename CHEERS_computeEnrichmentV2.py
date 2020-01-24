@@ -74,8 +74,7 @@ def load_sample_data(readin, samplesList):
         df.rename(columns={sample: 'value_' + str(sample)}, inplace=True)
     melt = pd.wide_to_long(df, ['value', 'rank'], i=['chr', 'start', 'end'], j='sample', sep='_', suffix='\\w+').reset_index() 
     melt.to_sql('peaks', conn, index=False, if_exists='replace')
-    return melt, rowCount
-    # Coul break write to disk here if needed
+    return rowCount
 
 @profile
 def load_snps(snps):
@@ -94,18 +93,24 @@ def merge_peaks_with_snps(sql_query, conn):
     merged.drop(columns=['snp_chr'], inplace=True)
     return merged
 
-peaks, N = load_sample_data(args.input, samplesList)
+print("loading peak data...")
+N = load_sample_data(args.input, samplesList)
+print("loading snp data...")
 load_snps(args.snp_list)
+print("merging data...")
 overlap = merge_peaks_with_snps(sql_query, conn)
 
+print("writing snp output")
 snp_out_name = str(args.outdir) + str(args.trait) + '_SNPsOverlappingPeaks.txt'
 SNPsOverlappingPeaks = overlap.groupby(['name', 'chr', 'pos', 'start', 'end','sample'])['rank'].min().unstack(fill_value='Null').reset_index()
 SNPsOverlappingPeaks.to_csv(snp_out_name, index=False)
 
+print("writing unique peaks output")
 uniquePeaks = overlap.groupby(['chr', 'start', 'end', 'sample'])['rank'].min().unstack(fill_value='Null').reset_index()
 unique_out_file = str(args.outdir) + str(args.trait) + '_uniquePeaks.txt'
 uniquePeaks.to_csv(unique_out_file, index=False)
 
+print("calculating means and p-values")
 samplesList = [{sample: {'observedMean': uniquePeaks[sample].mean()}} for sample in samplesList]
 
 n = len(uniquePeaks.index)
@@ -121,10 +126,10 @@ for sample in samplesList:
 create the txt file with the p-values
 '''
 pValueName = str(args.outdir) + str(args.trait) + '_disease_enrichment_pValues.txt'
-with open(pValueName, 'a') as f:
+with open(pValueName, 'w') as f:
     for sample in samplesList:
         for key, value in sample.iteritems():
-            f.write(key + '\t' + str(value['observedMean']) + '\n')
+            f.write(key + '\t' + str(value['pValue']) + '\n')
 
 '''
 create the txt file with the mean ranks
