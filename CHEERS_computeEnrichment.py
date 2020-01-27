@@ -52,7 +52,7 @@ output of the code: CHEERS_normalize.py
 
 #load data
 
-conn = sqlite3.connect('cheers_tmp.db')
+conn = sqlite3.connect(str(args.outdir) + 'cheers_tmp.db')
 
 #@profile
 def load_sample_data(readin, samplesList):
@@ -148,3 +148,6 @@ with open(logfileName, "w") as logfile:
     print >> logfile, 'Distribution sd\t%s' %  (str(mean_sd))
     print >> logfile, 'Running time in seconds\t%s' % (running_time)
 
+print("cleaning up")
+os.remove(str(args.outdir) + 'cheers_tmp.db')
+print("finished!")
