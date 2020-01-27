@@ -1,6 +1,6 @@
 import os
 from scipy.stats import norm
-import numpy
+import numpy as np
 import math
 import argparse
 import time
@@ -16,6 +16,9 @@ parser.add_argument("--ld", help = "Directory with LD information for each SNP i
 parser.add_argument("--snp_list", help = "list of SNPs if CHEERS is used on finemapped set")
 parser.add_argument("--trait", help = "Name of the analyzed trait")
 parser.add_argument("--outdir", help = "Directory where to output results")
+parser.add_argument("--db_type", help = "Store temp data on disk or in memory", default='memory', choices=['memory', 'disk'], required=False)
+parser.add_argument("--mean_calc", help = "Choose whether pandas or numpy calculates the mean", choices=['pandas', 'numpy'], default='numpy', required=False)
+
 args = parser.parse_args()
 
 #set the timer
@@ -52,7 +55,7 @@ output of the code: CHEERS_normalize.py
 
 #load data
 
-conn = sqlite3.connect(str(args.outdir) + 'cheers_tmp.db')
+conn = sqlite3.connect(str(args.outdir) + 'cheers_tmp.db') if args.db_type == 'disk' else sqlite3.connect(':memory:')
 
 #@profile
 def load_sample_data(readin, samplesList):
@@ -103,8 +106,11 @@ unique_out_file = str(args.outdir) + str(args.trait) + '_uniquePeaks.txt'
 uniquePeaks.to_csv(unique_out_file, index=False)
 
 print("calculating means and p-values")
-samplesList = [{sample: {'observedMean': uniquePeaks[sample].mean()}} for sample in samplesList]
-
+if args.mean_calc == 'pandas':
+    samplesList = [{sample: {'observedMean': uniquePeaks[sample].mean()}} for sample in samplesList]
+else:
+    samplesList = [{sample: {'observedMean': np.array(uniquePeaks[sample]).mean()}} for sample in samplesList]
+    
 n = len(uniquePeaks.index)
 
 mean_sd = math.sqrt((N**2-1)/(12*n))
@@ -114,6 +120,7 @@ for sample in samplesList:
     for key, value in sample.iteritems():
         value['pValue'] = 1-norm.cdf(value['observedMean'], loc=mean_mean, scale=mean_sd)
 
+print(samplesList)
 '''
 create the txt file with the p-values
 '''
@@ -148,6 +155,6 @@ with open(logfileName, "w") as logfile:
     print >> logfile, 'Distribution sd\t%s' %  (str(mean_sd))
     print >> logfile, 'Running time in seconds\t%s' % (running_time)
 
-print("cleaning up")
-os.remove(str(args.outdir) + 'cheers_tmp.db')
+#print("cleaning up")
+#os.remove(str(args.outdir) + 'cheers_tmp.db')
 print("finished!")
